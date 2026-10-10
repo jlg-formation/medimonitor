@@ -1,0 +1,661 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Courbes MediMonitor</title>
+<style>
+  :root {
+    color-scheme: light;
+    --page: #f9f9f7;
+    --surface: #fcfcfb;
+    --ink: #0b0b0b;
+    --ink-2: #52514e;
+    --muted: #898781;
+    --grid: #e1e0d9;
+    --axis: #c3c2b7;
+    --border: rgba(11, 11, 11, 0.10);
+    --series-1: #2a78d6;
+    --series-2: #eb6834;
+    --warning: #fab219;
+    --critical: #d03b3b;
+    --info: #898781;
+    --band-warning: rgba(250, 178, 25, 0.12);
+    --band-critical: rgba(208, 59, 59, 0.10);
+    --accent-bg: #e8f0fb;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      color-scheme: dark;
+      --page: #0d0d0d;
+      --surface: #1a1a19;
+      --ink: #f0efec;
+      --ink-2: #c3c2b7;
+      --grid: #2c2c2a;
+      --axis: #383835;
+      --border: rgba(255, 255, 255, 0.10);
+      --series-1: #3987e5;
+      --series-2: #d95926;
+      --band-warning: rgba(250, 178, 25, 0.10);
+      --band-critical: rgba(208, 59, 59, 0.16);
+      --accent-bg: #1c2a3d;
+    }
+  }
+  :root[data-theme="dark"] {
+    color-scheme: dark;
+    --page: #0d0d0d;
+    --surface: #1a1a19;
+    --ink: #f0efec;
+    --ink-2: #c3c2b7;
+    --grid: #2c2c2a;
+    --axis: #383835;
+    --border: rgba(255, 255, 255, 0.10);
+    --series-1: #3987e5;
+    --series-2: #d95926;
+    --band-warning: rgba(250, 178, 25, 0.10);
+    --band-critical: rgba(208, 59, 59, 0.16);
+    --accent-bg: #1c2a3d;
+  }
+
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    background: var(--page);
+    color: var(--ink);
+    font: 14px/1.45 system-ui, -apple-system, "Segoe UI", sans-serif;
+  }
+  main { max-width: 1180px; margin: 0 auto; padding: 24px 16px 48px; }
+  header { display: flex; flex-wrap: wrap; gap: 12px 24px; align-items: end; justify-content: space-between; margin-bottom: 16px; }
+  h1 { font-size: 20px; margin: 0; }
+  .sub { color: var(--ink-2); margin: 2px 0 0; }
+  .file-btn {
+    display: inline-flex; align-items: center; gap: 6px;
+    padding: 6px 12px; border: 1px solid var(--border); border-radius: 8px;
+    background: var(--surface); color: var(--ink); cursor: pointer; font: inherit;
+  }
+  .file-btn:hover { background: var(--accent-bg); }
+  .file-btn input { display: none; }
+
+  .tabs { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 12px; }
+  .tab {
+    border: 1px solid var(--border); background: var(--surface); color: var(--ink);
+    border-radius: 8px; padding: 6px 10px; cursor: pointer; font: inherit;
+    display: inline-flex; align-items: center; gap: 6px;
+  }
+  .tab[aria-selected="true"] { background: var(--accent-bg); border-color: var(--series-1); font-weight: 600; }
+  .dot { width: 8px; height: 8px; border-radius: 50%; display: inline-block; flex: none; }
+  .dot.normal { background: var(--axis); }
+  .dot.warning { background: var(--warning); }
+  .dot.critical { background: var(--critical); }
+  .dot.info { background: transparent; border: 2px solid var(--info); }
+
+  .summary { color: var(--ink-2); margin: 0 0 12px; min-height: 1.45em; }
+
+  .readout {
+    position: sticky; top: 0; z-index: 2;
+    display: grid; grid-template-columns: auto repeat(4, minmax(0, 1fr)); gap: 4px 16px; align-items: baseline;
+    background: var(--surface); border: 1px solid var(--border); border-radius: 10px;
+    padding: 10px 14px; margin-bottom: 12px;
+  }
+  .readout .time { font-weight: 600; font-variant-numeric: tabular-nums; }
+  .readout .k { color: var(--muted); font-size: 12px; display: block; }
+  .readout .v { font-variant-numeric: tabular-nums; font-weight: 600; }
+  .readout .s { font-size: 12px; color: var(--ink-2); display: inline-flex; align-items: center; gap: 4px; margin-left: 6px; }
+  @media (max-width: 640px) {
+    .readout { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    .readout .time { grid-column: 1 / -1; }
+  }
+
+  .legend { display: flex; flex-wrap: wrap; gap: 6px 16px; color: var(--ink-2); font-size: 12px; margin-bottom: 10px; }
+  .legend span { display: inline-flex; align-items: center; gap: 6px; }
+  .sw { width: 14px; height: 10px; border-radius: 2px; display: inline-block; border: 1px solid var(--border); }
+
+  .grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
+  @media (max-width: 860px) { .grid { grid-template-columns: 1fr; } }
+  .card { background: var(--surface); border: 1px solid var(--border); border-radius: 10px; padding: 12px 12px 6px; min-width: 0; }
+  .card h2 { font-size: 14px; margin: 0 0 2px; display: flex; gap: 12px; align-items: center; flex-wrap: wrap; }
+  .card h2 .unit { color: var(--muted); font-weight: 400; }
+  .card h2 .key { font-weight: 400; color: var(--ink-2); font-size: 12px; display: inline-flex; gap: 6px; align-items: center; }
+  .card svg { display: block; width: 100%; height: auto; touch-action: none; }
+  svg text { fill: var(--muted); font-size: 11px; font-variant-numeric: tabular-nums; }
+  svg .thr-label { font-size: 10px; }
+
+  details { margin-top: 16px; background: var(--surface); border: 1px solid var(--border); border-radius: 10px; padding: 10px 14px; }
+  summary { cursor: pointer; font-weight: 600; }
+  .table-wrap { overflow-x: auto; margin-top: 8px; }
+  table { border-collapse: collapse; width: 100%; font-variant-numeric: tabular-nums; }
+  th, td { text-align: right; padding: 4px 10px; border-bottom: 1px solid var(--grid); white-space: nowrap; }
+  th:first-child, td:first-child { text-align: left; }
+  th { color: var(--ink-2); font-weight: 600; }
+  td.warning { box-shadow: inset 3px 0 0 var(--warning); }
+  td.critical { box-shadow: inset 3px 0 0 var(--critical); font-weight: 600; }
+  td.info { color: var(--muted); font-style: italic; }
+  .note { color: var(--muted); font-size: 12px; margin-top: 16px; }
+  .error { color: var(--critical); }
+</style>
+</head>
+<body>
+<main>
+  <header>
+    <div>
+      <h1>Courbes MediMonitor — jeu de test TP3</h1>
+      <p class="sub" id="source">Chargement…</p>
+    </div>
+    <label class="file-btn">Ouvrir un autre CSV…
+      <input type="file" id="file" accept=".csv,text/csv">
+    </label>
+  </header>
+
+  <div class="tabs" role="tablist" id="tabs"></div>
+  <p class="summary" id="summary"></p>
+
+  <div class="readout" id="readout" aria-live="polite"></div>
+
+  <div class="legend">
+    <span><i class="sw" style="background:var(--band-warning)"></i>Zone d'alerte (WARNING)</span>
+    <span><i class="sw" style="background:var(--band-critical)"></i>Zone critique (CRITICAL)</span>
+    <span><i class="dot warning"></i>Mesure en alerte</span>
+    <span><i class="dot critical"></i>Mesure critique</span>
+    <span><i class="dot info"></i>Mesure absente / invalide</span>
+  </div>
+
+  <div class="grid" id="charts"></div>
+
+  <details>
+    <summary>Tableau des mesures</summary>
+    <div class="table-wrap" id="table"></div>
+  </details>
+
+  <p class="note">Seuils pédagogiques fictifs par défaut de MediMonitor (src/domain/thresholds.ts) — non validés médicalement.
+    Classification : x &lt; critique bas → CRITICAL ; x &lt; alerte bas → WARNING ; x &gt; critique haut → CRITICAL ; x &gt; alerte haut → WARNING.</p>
+</main>
+
+<!-- Copie embarquée du CSV : utilisée si le fichier ne peut pas être lu (ouverture en file://). -->
+<script type="text/csv" id="embedded-csv">
+patientId,timestamp,heartRate,spo2,temperature,systolic,diastolic
+P-001,2026-10-10T10:00:00Z,75,98,37.0,120,80
+P-001,2026-10-10T10:01:00Z,76,98,37.0,120,80
+P-001,2026-10-10T10:02:00Z,74,98,37.0,120,80
+P-001,2026-10-10T10:03:00Z,75,98,37.0,120,80
+P-001,2026-10-10T10:04:00Z,76,98,37.0,120,80
+P-001,2026-10-10T10:05:00Z,75,98,37.0,120,80
+P-001,2026-10-10T10:06:00Z,74,98,37.0,120,80
+P-001,2026-10-10T10:07:00Z,75,98,37.0,120,80
+P-001,2026-10-10T10:08:00Z,75,98,37.0,120,80
+P-001,2026-10-10T10:09:00Z,76,98,37.0,120,80
+P-001,2026-10-10T10:10:00Z,75,98,37.0,120,80
+P-002,2026-10-10T10:00:00Z,75,98,37.0,120,80
+P-002,2026-10-10T10:01:00Z,75,97,37.0,120,80
+P-002,2026-10-10T10:02:00Z,75,95,37.0,120,80
+P-002,2026-10-10T10:03:00Z,75,94,37.0,120,80
+P-002,2026-10-10T10:04:00Z,75,92,37.0,120,80
+P-002,2026-10-10T10:05:00Z,75,91,37.0,120,80
+P-002,2026-10-10T10:06:00Z,75,90,37.0,120,80
+P-002,2026-10-10T10:07:00Z,75,92,37.0,120,80
+P-002,2026-10-10T10:08:00Z,75,94,37.0,120,80
+P-002,2026-10-10T10:09:00Z,75,95,37.0,120,80
+P-002,2026-10-10T10:10:00Z,75,98,37.0,120,80
+P-003,2026-10-10T10:00:00Z,80,98,37.0,120,80
+P-003,2026-10-10T10:01:00Z,95,98,37.0,120,80
+P-003,2026-10-10T10:02:00Z,100,98,37.0,120,80
+P-003,2026-10-10T10:03:00Z,101,98,37.0,120,80
+P-003,2026-10-10T10:04:00Z,110,98,37.0,120,80
+P-003,2026-10-10T10:05:00Z,120,98,37.0,120,80
+P-003,2026-10-10T10:06:00Z,121,98,37.0,120,80
+P-003,2026-10-10T10:07:00Z,120,98,37.0,120,80
+P-003,2026-10-10T10:08:00Z,101,98,37.0,120,80
+P-003,2026-10-10T10:09:00Z,100,98,37.0,120,80
+P-003,2026-10-10T10:10:00Z,80,98,37.0,120,80
+P-004,2026-10-10T10:00:00Z,75,98,37.0,120,80
+P-004,2026-10-10T10:01:00Z,65,98,37.0,120,80
+P-004,2026-10-10T10:02:00Z,60,98,37.0,120,80
+P-004,2026-10-10T10:03:00Z,59,98,37.0,120,80
+P-004,2026-10-10T10:04:00Z,55,98,37.0,120,80
+P-004,2026-10-10T10:05:00Z,50,98,37.0,120,80
+P-004,2026-10-10T10:06:00Z,49,98,37.0,120,80
+P-004,2026-10-10T10:07:00Z,50,98,37.0,120,80
+P-004,2026-10-10T10:08:00Z,59,98,37.0,120,80
+P-004,2026-10-10T10:09:00Z,60,98,37.0,120,80
+P-004,2026-10-10T10:10:00Z,75,98,37.0,120,80
+P-005,2026-10-10T10:00:00Z,75,98,37.0,120,80
+P-005,2026-10-10T10:01:00Z,75,98,36.0,120,80
+P-005,2026-10-10T10:02:00Z,75,98,35.9,120,80
+P-005,2026-10-10T10:03:00Z,75,98,35.0,120,80
+P-005,2026-10-10T10:04:00Z,75,98,34.9,120,80
+P-005,2026-10-10T10:05:00Z,75,98,36.0,120,80
+P-005,2026-10-10T10:06:00Z,75,98,38.0,120,80
+P-005,2026-10-10T10:07:00Z,75,98,38.1,120,80
+P-005,2026-10-10T10:08:00Z,75,98,39.0,120,80
+P-005,2026-10-10T10:09:00Z,75,98,39.1,120,80
+P-005,2026-10-10T10:10:00Z,75,98,37.0,120,80
+P-006,2026-10-10T10:00:00Z,75,98,37.0,120,80
+P-006,2026-10-10T10:01:00Z,75,98,37.0,135,85
+P-006,2026-10-10T10:02:00Z,75,98,37.0,140,90
+P-006,2026-10-10T10:03:00Z,75,98,37.0,141,91
+P-006,2026-10-10T10:04:00Z,75,98,37.0,150,95
+P-006,2026-10-10T10:05:00Z,75,98,37.0,160,100
+P-006,2026-10-10T10:06:00Z,75,98,37.0,161,101
+P-006,2026-10-10T10:07:00Z,75,98,37.0,160,100
+P-006,2026-10-10T10:08:00Z,75,98,37.0,141,91
+P-006,2026-10-10T10:09:00Z,75,98,37.0,140,90
+P-006,2026-10-10T10:10:00Z,75,98,37.0,120,80
+P-007,2026-10-10T10:00:00Z,75,98,37.0,120,80
+P-007,2026-10-10T10:01:00Z,75,98,37.0,105,70
+P-007,2026-10-10T10:02:00Z,75,98,37.0,100,65
+P-007,2026-10-10T10:03:00Z,75,98,37.0,99,64
+P-007,2026-10-10T10:04:00Z,75,98,37.0,95,62
+P-007,2026-10-10T10:05:00Z,75,98,37.0,90,60
+P-007,2026-10-10T10:06:00Z,75,98,37.0,89,59
+P-007,2026-10-10T10:07:00Z,75,98,37.0,90,60
+P-007,2026-10-10T10:08:00Z,75,98,37.0,99,64
+P-007,2026-10-10T10:09:00Z,75,98,37.0,100,65
+P-007,2026-10-10T10:10:00Z,75,98,37.0,120,80
+P-008,2026-10-10T10:00:00Z,75,98,37.0,120,80
+P-008,2026-10-10T10:01:00Z,75,97,37.0,120,80
+P-008,2026-10-10T10:02:00Z,75,,37.0,120,80
+P-008,2026-10-10T10:03:00Z,75,93,37.0,120,80
+P-008,2026-10-10T10:04:00Z,121,94,37.0,120,80
+P-008,2026-10-10T10:05:00Z,75,95,37.0,120,80
+P-008,2026-10-10T10:06:00Z,75,94,37.0,120,80
+P-008,2026-10-10T10:07:00Z,75,95,37.0,120,80
+P-008,2026-10-10T10:08:00Z,75,96,37.0,120,80
+P-008,2026-10-10T10:09:00Z,75,97,37.0,120,80
+P-008,2026-10-10T10:10:00Z,75,98,37.0,120,80
+</script>
+
+<script>
+'use strict';
+
+const CSV_FILE = 'medimonitor-test-data-corrige.csv';
+
+// Seuils par défaut de MediMonitor (src/domain/thresholds.ts).
+const THRESHOLDS = {
+  heartRate:   { criticalLow: 50, warningLow: 60, warningHigh: 100, criticalHigh: 120 },
+  spo2:        { criticalLow: 92, warningLow: 95, warningHigh: null, criticalHigh: null },
+  temperature: { criticalLow: 35, warningLow: 36, warningHigh: 38, criticalHigh: 39 },
+  systolic:    { criticalLow: 90, warningLow: 100, warningHigh: 140, criticalHigh: 160 },
+  diastolic:   { criticalLow: 60, warningLow: 65, warningHigh: 90, criticalHigh: 100 },
+};
+
+const VITALS = {
+  heartRate:   { label: 'Fréquence cardiaque', short: 'FC', unit: 'bpm', decimals: 0 },
+  spo2:        { label: 'SpO₂', short: 'SpO₂', unit: '%', decimals: 0 },
+  temperature: { label: 'Température', short: 'Temp.', unit: '°C', decimals: 1 },
+  systolic:    { label: 'Systolique', short: 'PAS', unit: 'mmHg', decimals: 0 },
+  diastolic:   { label: 'Diastolique', short: 'PAD', unit: 'mmHg', decimals: 0 },
+};
+
+// Un graphique par grandeur : chacun porte ses propres zones de seuils.
+const CHARTS = [
+  { id: 'hr',   title: 'Fréquence cardiaque',              unit: 'bpm',  domain: [40, 130], keys: ['heartRate'] },
+  { id: 'spo2', title: 'SpO₂',                             unit: '%',    domain: [86, 100], keys: ['spo2'] },
+  { id: 'temp', title: 'Température',                      unit: '°C',   domain: [34, 40],  keys: ['temperature'] },
+  { id: 'sys',  title: 'Pression artérielle systolique',   unit: 'mmHg', domain: [80, 170], keys: ['systolic'] },
+  { id: 'dia',  title: 'Pression artérielle diastolique',  unit: 'mmHg', domain: [50, 110], keys: ['diastolic'] },
+];
+const SERIES_COLOR = ['var(--series-1)', 'var(--series-2)'];
+
+const SEVERITY_RANK = { normal: 0, info: 1, warning: 2, critical: 3 };
+const SEVERITY_TEXT = { normal: 'Normal', info: 'Absente', warning: 'Alerte', critical: 'Critique' };
+
+function classify(key, value) {
+  if (value === null) return { severity: 'info', text: 'Absente / invalide' };
+  const t = THRESHOLDS[key];
+  if (value < t.criticalLow) return { severity: 'critical', text: 'Critique bas' };
+  if (value < t.warningLow) return { severity: 'warning', text: 'Alerte basse' };
+  if (t.criticalHigh !== null && value > t.criticalHigh) return { severity: 'critical', text: 'Critique haut' };
+  if (t.warningHigh !== null && value > t.warningHigh) return { severity: 'warning', text: 'Alerte haute' };
+  return { severity: 'normal', text: 'Normal' };
+}
+
+function parseCsv(text) {
+  const lines = text.trim().split(/\r?\n/).filter((l) => l.trim() !== '');
+  const header = lines.shift().split(',').map((h) => h.trim());
+  const rows = lines.map((line) => {
+    const cells = line.split(',');
+    const rec = {};
+    header.forEach((h, i) => { rec[h] = (cells[i] ?? '').trim(); });
+    const row = { patientId: rec.patientId, time: new Date(rec.timestamp), timestamp: rec.timestamp };
+    for (const key of Object.keys(VITALS)) {
+      const n = rec[key] === '' || rec[key] === undefined ? NaN : Number(rec[key]);
+      row[key] = Number.isFinite(n) ? n : null;
+    }
+    return row;
+  });
+  const byPatient = new Map();
+  for (const r of rows) {
+    if (!byPatient.has(r.patientId)) byPatient.set(r.patientId, []);
+    byPatient.get(r.patientId).push(r);
+  }
+  for (const list of byPatient.values()) list.sort((a, b) => a.time - b.time);
+  return byPatient;
+}
+
+const fmtTime = (d) => d.toISOString().slice(11, 16);
+const fmtValue = (key, v) => (v === null ? '—' : v.toFixed(VITALS[key].decimals).replace('.', ','));
+
+// ---------- état ----------
+let data = new Map();
+let current = null;
+let hoverIndex = null;
+
+// ---------- SVG ----------
+const NS = 'http://www.w3.org/2000/svg';
+function el(name, attrs, parent) {
+  const node = document.createElementNS(NS, name);
+  for (const [k, v] of Object.entries(attrs)) node.setAttribute(k, v);
+  if (parent) parent.appendChild(node);
+  return node;
+}
+
+function niceStep(span, target) {
+  const raw = span / target;
+  const p = Math.pow(10, Math.floor(Math.log10(raw)));
+  const m = raw / p;
+  return (m < 1.5 ? 1 : m < 3 ? 2 : m < 7 ? 5 : 10) * p;
+}
+
+function renderChart(card, chart, rows) {
+  const old = card.querySelector('svg');
+  if (old) old.remove();
+  const W = Math.max(280, card.clientWidth - 24);
+  const H = 210;
+  const m = { l: 40, r: 44, t: 10, b: 24 };
+  const pw = W - m.l - m.r;
+  const ph = H - m.t - m.b;
+
+  // Domaine fixe élargi si une valeur en sort.
+  let [lo, hi] = chart.domain;
+  for (const r of rows) for (const k of chart.keys) {
+    if (r[k] !== null) { lo = Math.min(lo, r[k]); hi = Math.max(hi, r[k]); }
+  }
+  const t0 = rows[0].time.getTime();
+  const t1 = rows[rows.length - 1].time.getTime();
+  const x = (d) => m.l + (t1 === t0 ? pw / 2 : ((d.getTime() - t0) / (t1 - t0)) * pw);
+  const y = (v) => m.t + ph - ((v - lo) / (hi - lo)) * ph;
+  const clampY = (v) => Math.max(m.t, Math.min(m.t + ph, y(v)));
+
+  const svg = el('svg', { viewBox: `0 0 ${W} ${H}`, role: 'img', 'aria-label': `${chart.title} — ${current}` });
+
+  // Zones d'alerte / critiques.
+  const bands = el('g', {}, svg);
+  {
+    const t = THRESHOLDS[chart.keys[0]];
+    const zones = [
+      [lo, t.criticalLow, 'critical'],
+      [t.criticalLow, t.warningLow, 'warning'],
+    ];
+    if (t.warningHigh !== null) zones.push([t.warningHigh, t.criticalHigh ?? hi, 'warning']);
+    if (t.criticalHigh !== null) zones.push([t.criticalHigh, hi, 'critical']);
+    for (const [a, b, sev] of zones) {
+      const ya = clampY(Math.max(a, lo));
+      const yb = clampY(Math.min(b, hi));
+      if (ya - yb <= 0) continue;
+      el('rect', { x: m.l, y: yb, width: pw, height: ya - yb, fill: `var(--band-${sev})` }, bands);
+    }
+  }
+
+  // Grille et axe Y.
+  const step = niceStep(hi - lo, 5);
+  for (let v = Math.ceil(lo / step) * step; v <= hi + 1e-9; v += step) {
+    const yy = y(v);
+    el('line', { x1: m.l, x2: m.l + pw, y1: yy, y2: yy, stroke: 'var(--grid)', 'stroke-width': 1 }, svg);
+    const tx = el('text', { x: m.l - 6, y: yy + 3.5, 'text-anchor': 'end' }, svg);
+    tx.textContent = String(+v.toFixed(2)).replace('.', ',');
+  }
+
+  // Lignes de seuil (pointillés) étiquetées à droite.
+  const thrSeen = new Set();
+  chart.keys.forEach((k, ki) => {
+    const t = THRESHOLDS[k];
+    for (const [name, v] of Object.entries(t)) {
+      if (v === null || v < lo || v > hi) continue;
+      const sev = name.startsWith('critical') ? 'critical' : 'warning';
+      el('line', {
+        x1: m.l, x2: m.l + pw, y1: y(v), y2: y(v),
+        stroke: `var(--${sev})`, 'stroke-width': 1, 'stroke-dasharray': '3 3', opacity: 0.8,
+      }, svg);
+      const keyLabel = chart.keys.length > 1 ? (ki === 0 ? 'S ' : 'D ') : '';
+      if (thrSeen.has(v)) continue;
+      thrSeen.add(v);
+      const lab = el('text', { x: m.l + pw + 4, y: y(v) + 3.5, class: 'thr-label' }, svg);
+      lab.textContent = keyLabel + String(v).replace('.', ',');
+    }
+  });
+
+  // Axe X.
+  el('line', { x1: m.l, x2: m.l + pw, y1: m.t + ph, y2: m.t + ph, stroke: 'var(--axis)', 'stroke-width': 1 }, svg);
+  const every = Math.max(1, Math.ceil(rows.length / Math.max(2, Math.floor(pw / 56))));
+  rows.forEach((r, i) => {
+    if (i % every !== 0 && i !== rows.length - 1) return;
+    const tx = el('text', { x: x(r.time), y: H - 6, 'text-anchor': 'middle' }, svg);
+    tx.textContent = fmtTime(r.time);
+  });
+
+  // Curseur vertical.
+  const cursor = el('line', {
+    y1: m.t, y2: m.t + ph, stroke: 'var(--ink-2)', 'stroke-width': 1, opacity: 0, class: 'cursor',
+  }, svg);
+
+  // Séries : ligne interrompue sur valeur absente, marqueurs colorés selon la sévérité.
+  chart.keys.forEach((k, ki) => {
+    const color = SERIES_COLOR[ki];
+    let d = '';
+    let pen = false;
+    for (const r of rows) {
+      if (r[k] === null) { pen = false; continue; }
+      d += `${pen ? 'L' : 'M'}${x(r.time).toFixed(1)},${y(r[k]).toFixed(1)}`;
+      pen = true;
+    }
+    el('path', { d, fill: 'none', stroke: color, 'stroke-width': 2, 'stroke-linejoin': 'round', 'stroke-linecap': 'round' }, svg);
+
+    rows.forEach((r, i) => {
+      const c = classify(k, r[k]);
+      if (r[k] === null) {
+        // Repère « absent » sur l'axe X.
+        const cx = x(r.time);
+        const cy = m.t + ph - 7;
+        el('circle', { cx, cy, r: 4, fill: 'var(--surface)', stroke: 'var(--info)', 'stroke-width': 2, 'stroke-dasharray': '2 2', 'data-i': i }, svg);
+        const lab = el('text', { x: cx, y: cy - 8, 'text-anchor': 'middle', class: 'thr-label' }, svg);
+        lab.textContent = 'absent';
+        return;
+      }
+      const fill = c.severity === 'normal' ? 'var(--surface)' : `var(--${c.severity})`;
+      el('circle', {
+        cx: x(r.time), cy: y(r[k]), r: c.severity === 'normal' ? 3.5 : 4.5,
+        fill, stroke: c.severity === 'normal' ? color : 'var(--surface)', 'stroke-width': 2,
+        'data-i': i,
+      }, svg);
+    });
+  });
+
+  // Zone de survol (plus large que les marqueurs).
+  const hit = el('rect', { x: m.l - 10, y: 0, width: pw + 20, height: H, fill: 'transparent' }, svg);
+  const pick = (evt) => {
+    const box = svg.getBoundingClientRect();
+    const px = ((evt.clientX - box.left) / box.width) * W;
+    let best = 0;
+    let bestD = Infinity;
+    rows.forEach((r, i) => { const dd = Math.abs(x(r.time) - px); if (dd < bestD) { bestD = dd; best = i; } });
+    setHover(best);
+  };
+  hit.addEventListener('pointermove', pick);
+  hit.addEventListener('pointerdown', pick);
+  hit.addEventListener('pointerleave', () => setHover(null));
+
+  svg._x = (i) => x(rows[i].time);
+  card.appendChild(svg);
+}
+
+function setHover(i) {
+  hoverIndex = i;
+  const rows = data.get(current);
+  document.querySelectorAll('#charts svg').forEach((svg) => {
+    const cur = svg.querySelector('.cursor');
+    if (i === null) { cur.setAttribute('opacity', 0); }
+    else {
+      const xx = svg._x(i);
+      cur.setAttribute('x1', xx); cur.setAttribute('x2', xx); cur.setAttribute('opacity', 0.5);
+    }
+    svg.querySelectorAll('circle[data-i]').forEach((c) => {
+      c.style.transform = '';
+      c.setAttribute('r', c.dataset.r0 ?? (c.dataset.r0 = c.getAttribute('r')));
+      if (i !== null && Number(c.dataset.i) === i) c.setAttribute('r', Number(c.dataset.r0) + 2);
+    });
+  });
+  renderReadout(rows, i === null ? worstIndex(rows) : i, i === null);
+}
+
+function worstIndex(rows) {
+  let best = 0;
+  let bestScore = -1;
+  rows.forEach((r, i) => {
+    const score = Object.keys(VITALS).reduce((s, k) => s + SEVERITY_RANK[classify(k, r[k]).severity] ** 2, 0);
+    if (score > bestScore) { bestScore = score; best = i; }
+  });
+  return best;
+}
+
+function renderReadout(rows, i, isDefault) {
+  const r = rows[i];
+  const cell = (key) => {
+    const c = classify(key, r[key]);
+    return `<div><span class="k">${VITALS[key].label}</span>` +
+      `<span class="v">${fmtValue(key, r[key])}</span> <span class="k" style="display:inline">${VITALS[key].unit}</span>` +
+      `<span class="s"><i class="dot ${c.severity}"></i>${c.text}</span></div>`;
+  };
+  const bp = () => {
+    const cs = classify('systolic', r.systolic);
+    const cd = classify('diastolic', r.diastolic);
+    const worst = SEVERITY_RANK[cs.severity] >= SEVERITY_RANK[cd.severity] ? cs : cd;
+    return `<div><span class="k">Pression artérielle</span>` +
+      `<span class="v">${fmtValue('systolic', r.systolic)}/${fmtValue('diastolic', r.diastolic)}</span> <span class="k" style="display:inline">mmHg</span>` +
+      `<span class="s"><i class="dot ${worst.severity}"></i>${worst.text}</span></div>`;
+  };
+  document.getElementById('readout').innerHTML =
+    `<div class="time">${current} · ${fmtTime(r.time)}<span class="k">${isDefault ? 'point le plus anormal — survolez les courbes' : 'mesure survolée'}</span></div>` +
+    cell('heartRate') + cell('spo2') + cell('temperature') + bp();
+}
+
+function patientSeverity(rows) {
+  let worst = 'normal';
+  for (const r of rows) for (const k of Object.keys(VITALS)) {
+    const s = classify(k, r[k]).severity;
+    if (SEVERITY_RANK[s] > SEVERITY_RANK[worst]) worst = s;
+  }
+  return worst;
+}
+
+function patientSummary(rows) {
+  const parts = [];
+  for (const k of Object.keys(VITALS)) {
+    const counts = { warning: 0, critical: 0, info: 0 };
+    let min = Infinity;
+    let max = -Infinity;
+    for (const r of rows) {
+      const s = classify(k, r[k]).severity;
+      if (s in counts) counts[s]++;
+      if (r[k] !== null) { min = Math.min(min, r[k]); max = Math.max(max, r[k]); }
+    }
+    const bits = [];
+    if (counts.critical) bits.push(`${counts.critical} critique${counts.critical > 1 ? 's' : ''}`);
+    if (counts.warning) bits.push(`${counts.warning} alerte${counts.warning > 1 ? 's' : ''}`);
+    if (counts.info) bits.push(`${counts.info} absente${counts.info > 1 ? 's' : ''}`);
+    if (bits.length) parts.push(`<strong>${VITALS[k].short}</strong> ${fmtValue(k, min)}–${fmtValue(k, max)} ${VITALS[k].unit} (${bits.join(', ')})`);
+  }
+  return parts.length ? parts.join(' · ') : 'Toutes les mesures sont dans les limites normales.';
+}
+
+function renderTable(rows) {
+  const keys = Object.keys(VITALS);
+  let html = '<table><thead><tr><th>Heure (UTC)</th>' +
+    keys.map((k) => `<th>${VITALS[k].label} (${VITALS[k].unit})</th>`).join('') + '</tr></thead><tbody>';
+  for (const r of rows) {
+    html += `<tr><td>${fmtTime(r.time)}</td>` + keys.map((k) => {
+      const c = classify(k, r[k]);
+      const title = c.severity === 'normal' ? '' : ` title="${c.text}"`;
+      return `<td class="${c.severity}"${title}>${fmtValue(k, r[k])}${c.severity === 'normal' ? '' : ` <span class="k" style="display:inline">${SEVERITY_TEXT[c.severity]}</span>`}</td>`;
+    }).join('') + '</tr>';
+  }
+  document.getElementById('table').innerHTML = html + '</tbody></table>';
+}
+
+function renderTabs() {
+  const tabs = document.getElementById('tabs');
+  tabs.innerHTML = '';
+  for (const [id, rows] of data) {
+    const b = document.createElement('button');
+    b.className = 'tab';
+    b.setAttribute('role', 'tab');
+    b.setAttribute('aria-selected', String(id === current));
+    const sev = patientSeverity(rows);
+    b.innerHTML = `<i class="dot ${sev}"></i>${id}`;
+    b.title = SEVERITY_TEXT[sev];
+    b.addEventListener('click', () => selectPatient(id));
+    tabs.appendChild(b);
+  }
+}
+
+function renderCharts() {
+  const rows = data.get(current);
+  const host = document.getElementById('charts');
+  if (!host.children.length) {
+    for (const chart of CHARTS) {
+      const card = document.createElement('section');
+      card.className = 'card';
+      card.dataset.chart = chart.id;
+      const key = chart.keys.length > 1
+        ? chart.keys.map((k, i) => `<span class="key"><i class="sw" style="background:${SERIES_COLOR[i]};height:3px;border:0"></i>${VITALS[k].label}</span>`).join('')
+        : '';
+      card.innerHTML = `<h2>${chart.title} <span class="unit">(${chart.unit})</span>${key}</h2>`;
+      host.appendChild(card);
+    }
+  }
+  CHARTS.forEach((chart) => renderChart(host.querySelector(`[data-chart="${chart.id}"]`), chart, rows));
+}
+
+function selectPatient(id) {
+  current = id;
+  renderTabs();
+  document.getElementById('summary').innerHTML = patientSummary(data.get(id));
+  renderCharts();
+  renderTable(data.get(id));
+  setHover(null);
+}
+
+function load(text, sourceLabel) {
+  try {
+    data = parseCsv(text);
+    if (!data.size) throw new Error('aucune ligne de données');
+    const n = [...data.values()].reduce((s, l) => s + l.length, 0);
+    document.getElementById('source').textContent = `${sourceLabel} — ${data.size} patients, ${n} mesures`;
+    selectPatient(data.has(current) ? current : data.keys().next().value);
+  } catch (e) {
+    document.getElementById('source').innerHTML = `<span class="error">CSV illisible : ${e.message}</span>`;
+  }
+}
+
+document.getElementById('file').addEventListener('change', async (e) => {
+  const f = e.target.files[0];
+  if (f) load(await f.text(), f.name);
+});
+
+let resizeTimer;
+window.addEventListener('resize', () => {
+  clearTimeout(resizeTimer);
+  resizeTimer = setTimeout(() => { if (current) { renderCharts(); setHover(hoverIndex); } }, 120);
+});
+
+(async () => {
+  try {
+    const res = await fetch(CSV_FILE, { cache: 'no-store' });
+    if (!res.ok) throw new Error(res.statusText);
+    load(await res.text(), CSV_FILE);
+  } catch {
+    // Ouverture en file:// : le navigateur bloque fetch, on utilise la copie embarquée.
+    load(document.getElementById('embedded-csv').textContent, `${CSV_FILE} (copie embarquée)`);
+  }
+})();
+</script>
+</body>
+</html>
