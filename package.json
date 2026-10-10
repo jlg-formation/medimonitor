@@ -11,7 +11,11 @@
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
     "test:watch": "vitest",
-    "test:e2e": "playwright test"
+    "test:e2e": "playwright test",
+    "test:tp4": "vitest run --config exercices/sujets/tp4/vitest.config.ts",
+    "test:tp4:coverage": "vitest run --config exercices/sujets/tp4/vitest.config.ts --coverage",
+    "test:tp4:corrige": "vitest run --config exercices/corriges/tp4/vitest.config.ts",
+    "test:tp4:mutants": "node exercices/corriges/tp4/run-mutants.ts"
   },
   "dependencies": {
     "react": "^18.3.1",
@@ -29,6 +33,7 @@
     "@types/react": "^18.3.31",
     "@types/react-dom": "^18.3.7",
     "@vitejs/plugin-react": "^6.1.2",
+    "@vitest/coverage-v8": "^5.0.3",
     "eslint": "^10.12.0",
     "eslint-plugin-react-hooks": "^7.1.1",
     "globals": "^17.13.0",
